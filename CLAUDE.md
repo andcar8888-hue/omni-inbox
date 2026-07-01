@@ -1,8 +1,8 @@
 # Omni-Inbox — Project Context
 
 ## What this is
-A unified inbox so a business can reply to WhatsApp, Messenger, Instagram, and
-Telegram leads from one screen. Inbound messages arrive via webhooks, get
+A unified inbox so a business can reply to WhatsApp, Messenger, Instagram,
+Telegram, and TikTok leads from one screen. Inbound messages arrive via webhooks, get
 normalized into a common schema, stored in MySQL, and shown in a React inbox.
 Outbound replies go back out through the matching platform's API.
 
@@ -33,6 +33,18 @@ Outbound replies go back out through the matching platform's API.
 
 ## Folder ownership
 - `backend/app/Services/Channels/*` = one file per platform adapter, same
-  interface: `sendMessage()`, `normalizeIncoming()`.
+  interface: `sendMessage()`, `normalizeIncoming()`. Supported platforms:
+  WhatsApp, Messenger, Instagram, Telegram, and TikTok (TikTok adapter lands
+  in Phase 5 — see the blocker note below).
 - `frontend/src/components/inbox/*` = the 3-pane inbox UI from the reference
   screenshot (conversation list, active thread, contact panel).
+
+## Known dependencies / blockers
+- ⚠️ **TikTok messaging requires an approved TikTok for Business partnership.**
+  Unlike WhatsApp, Messenger, Instagram, and Telegram — which have no such
+  gate — TikTok's messaging API is only accessible once the TikTok for Business
+  partner application is approved. This is an **external/business dependency,
+  not an engineering task**, and it must be resolved before Phase 5's TikTok
+  integration work can actually ship. The `tiktok` platform value exists in the
+  schema/model ahead of that approval, but the `Services/Channels` TikTok
+  adapter cannot be exercised against the live API until the partnership clears.

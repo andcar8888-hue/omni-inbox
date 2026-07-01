@@ -29,7 +29,7 @@ class ChannelModel extends Model
 
     protected $validationRules = [
         'business_id'         => 'required|is_natural_no_zero',
-        'platform'            => 'required|in_list[whatsapp,messenger,instagram,telegram]',
+        'platform'            => 'required|in_list[whatsapp,messenger,instagram,telegram,tiktok]',
         // UNIQUE KEY uniq_channel (platform, external_account_id) is COMPOSITE.
         // CI4's is_unique cannot express a two-column uniqueness constraint, and a
         // single-column is_unique[channels.external_account_id] would be WRONG here
