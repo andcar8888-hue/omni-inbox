@@ -29,6 +29,17 @@ export const CHANNEL_CONFIG = {
     badgeClasses: 'bg-sky-500 text-white',
     dotClasses: 'bg-sky-500',
   },
+  // TikTok's brand mark is black with cyan/pink accents, but since every
+  // other channel here reads as one solid dot color, we use the cyan accent
+  // (Tailwind's `teal-500`) — it's the most recognizable single color from
+  // the TikTok logo and doesn't collide with any existing dot color
+  // (emerald/blue/pink/sky above).
+  tiktok: {
+    label: 'TT',
+    name: 'TikTok',
+    badgeClasses: 'bg-teal-500 text-white',
+    dotClasses: 'bg-teal-500',
+  },
 }
 
 export function getChannelConfig(platform) {
