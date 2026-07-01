@@ -19,14 +19,17 @@ use CodeIgniter\Config\BaseService;
  */
 class Services extends BaseService
 {
-    /*
-     * public static function example($getShared = true)
-     * {
-     *     if ($getShared) {
-     *         return static::getSharedInstance('example');
-     *     }
-     *
-     *     return new \CodeIgniter\Example();
-     * }
+    /**
+     * Per-request holder for the authenticated identity (populated by
+     * JwtAuthFilter, read by controllers). Shared so filter and controller
+     * see the same instance within a request.
      */
+    public static function authContext(bool $getShared = true): \App\Services\AuthContext
+    {
+        if ($getShared) {
+            return static::getSharedInstance('authContext');
+        }
+
+        return new \App\Services\AuthContext();
+    }
 }
