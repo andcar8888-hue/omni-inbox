@@ -91,6 +91,31 @@ Log in via `POST /api/v1/auth/login` with that email/password to receive a JWT,
 then send it as `Authorization: Bearer <token>` on the protected endpoints
 (see [docs/api-contract.md](docs/api-contract.md)).
 
+### Telegram dev channel (optional)
+
+To exercise the inbound Telegram webhook and outbound Telegram replies locally,
+seed one `telegram` channel for the dev business (run **after** `DevLoginSeeder`,
+which creates that business):
+
+```bash
+cd backend
+php spark db:seed DevTelegramChannelSeeder
+```
+
+Idempotent, runs against your **dev** (`default`) database, and creates a single
+`channels` row (`platform=telegram`). Then set real values in `backend/.env`:
+
+- `TELEGRAM_BOT_TOKEN` — your bot token from [@BotFather](https://t.me/BotFather)
+  (used for outbound `sendMessage`).
+- `TELEGRAM_WEBHOOK_SECRET` — the `secret_token` you pass to Telegram's
+  `setWebhook`; Telegram echoes it in the `X-Telegram-Bot-Api-Secret-Token`
+  header and the webhook rejects any request whose value doesn't match.
+
+Replace the seeded `external_account_id` placeholder (`your_bot_username`) with
+your real bot username. Note: the token itself is read from `.env`, **not** from
+the channel row's `credentials_encrypted` column (that column holds a
+placeholder for Telegram).
+
 ## Frontend setup
 
 ```bash

@@ -82,6 +82,43 @@ channels (id) ---- conversations (channel_id) ---- messages (conversation_id)
   `ResponseFormatter::error`. HTTP status carries the coarse category
   (400/401/404/422/500); `code` carries the specific machine-readable reason.
 
+## Inbound webhooks (platform -> us)
+
+Platform inbound events arrive at top-level routes under `/webhooks/*` — NOT
+under `/api/v1`. They are called by the platform's servers, not a logged-in
+agent, so they carry **no JWT** and **no CORS**; legitimacy is verified inside
+each handler by that platform's own mechanism. Heavy work stays out of the
+controller (thin dispatch to a Service), so the handler responds fast.
+
+### `POST /webhooks/telegram`
+
+Inbound Telegram Bot API `Update`. Handled by
+`App\Controllers\Webhooks\TelegramWebhook::receive`, which delegates to
+`App\Services\TelegramInboundService`.
+
+- **Verification (no JWT):** Telegram has no HMAC body signature. Instead, the
+  `secret_token` registered via `setWebhook` is echoed on every delivery in the
+  `X-Telegram-Bot-Api-Secret-Token` header. The controller compares it
+  **constant-time** (`hash_equals`) against `env('TELEGRAM_WEBHOOK_SECRET')` and
+  **fails closed**: a missing header, a wrong value, or an unconfigured secret
+  (the placeholder sentinel) all return **401** with
+  `{ "error": { "code": "invalid_secret", ... } }` before any work is done.
+- **Success shape:** `200` with `{ "data": { "result": "<result>" } }` where
+  `result` is one of `stored` (new inbound message persisted), `duplicate`
+  (this `update_id` was already processed — idempotent), or `ignored`
+  (non-text / non-message update, undecodable body, or a setup problem such as
+  no telegram channel configured). Telegram only cares about the `200`; the body
+  is for observability/tests.
+- **Idempotency:** dedupe on a channel-scoped key `tg:{channel_id}:{update_id}`
+  (the `messages.external_message_id` UNIQUE column) BEFORE inserting, so
+  Telegram's retries never double-insert.
+- **Unread counting:** each stored inbound message atomically increments the
+  conversation's `unread_count` (`unread_count + 1` as a SQL expression, not a
+  read-then-write) so concurrent deliveries can't clobber the count.
+- **Config:** `TELEGRAM_WEBHOOK_SECRET` (inbound verification) and
+  `TELEGRAM_BOT_TOKEN` (outbound `sendMessage`) live in `.env`
+  (see `.env.example`). Both have "not configured" placeholder sentinels.
+
 ## Timestamps
 
 All timestamps are stored in **UTC** (`gmdate('Y-m-d H:i:s')`). The frontend is

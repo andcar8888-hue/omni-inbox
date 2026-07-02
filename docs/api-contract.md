@@ -205,3 +205,26 @@ conversation's `last_message_at` is updated.
 | 401    | missing_token / invalid_token | No/invalid token |
 | 422    | validation_error       | `body` missing/invalid |
 | 404    | conversation_not_found | Conversation does not exist OR belongs to another business (not leaked) |
+
+---
+
+## Inbound platform webhooks (not `/api/v1`, no JWT)
+
+These endpoints are called by the platforms' servers, not by API clients, so
+they live at top-level `/webhooks/*` (no JWT, no CORS) and are verified by each
+platform's own secret. They are documented in full in
+[architecture.md](architecture.md#inbound-webhooks-platform---us); summarised
+here for discoverability.
+
+### POST `/webhooks/telegram`
+
+Inbound Telegram Bot API `Update`. **Not** JWT-authenticated: verified by the
+`X-Telegram-Bot-Api-Secret-Token` header compared constant-time against
+`TELEGRAM_WEBHOOK_SECRET`.
+
+- **200** `{ "data": { "result": "stored" | "duplicate" | "ignored" } }` —
+  `stored` = new inbound message persisted; `duplicate` = idempotent replay of
+  the same `update_id`; `ignored` = nothing to store (non-text update, bad body,
+  or setup issue).
+- **401** `{ "error": { "code": "invalid_secret", "message": ... } }` — missing,
+  wrong, or unconfigured secret token.

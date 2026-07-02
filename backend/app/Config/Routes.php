@@ -5,6 +5,14 @@ use CodeIgniter\Router\RouteCollection;
 /** @var RouteCollection $routes */
 $routes->get('/', 'Home::index');
 
+// Platform inbound webhooks. Top-level (NOT under api/v1): these are called by
+// the platform's servers, so no JWT filter and no CORS. Legitimacy is verified
+// inside each handler per that platform's own mechanism (Telegram: the
+// X-Telegram-Bot-Api-Secret-Token header vs TELEGRAM_WEBHOOK_SECRET).
+$routes->group('webhooks', ['namespace' => 'App\Controllers\Webhooks'], static function (RouteCollection $routes) {
+    $routes->post('telegram', 'TelegramWebhook::receive');
+});
+
 $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\V1'], static function (RouteCollection $routes) {
     // Catch-all OPTIONS handler so CORS preflight requests have a route to
     // match. CI4 resolves routes before running filters, so without this the
