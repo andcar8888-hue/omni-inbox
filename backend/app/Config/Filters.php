@@ -108,5 +108,15 @@ class Filters extends BaseFilters
      *
      * @var array<string, array<string, list<string>>>
      */
-    public array $filters = [];
+    public array $filters = [
+        // Apply CORS to the versioned API so the Vite dev frontend
+        // (http://localhost:5173) can call it cross-origin. The CI4 CORS
+        // filter must run `before` (to answer preflight OPTIONS and
+        // short-circuit) and `after` (to attach the CORS headers to the
+        // real response).
+        'cors' => [
+            'before' => ['api/v1/*'],
+            'after'  => ['api/v1/*'],
+        ],
+    ];
 }

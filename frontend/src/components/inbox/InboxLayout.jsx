@@ -2,9 +2,8 @@ import { useMemo, useState } from 'react'
 import ConversationList from './ConversationList'
 import ActiveThread from './ActiveThread'
 import ContactPanel from './ContactPanel'
-import DevScenarioBar from './DevScenarioBar'
-import { useConversations, useMessages } from '../../hooks/useInboxData'
-import { MOCK_BUSINESS } from '../../api/mockData'
+import { useConversations, useMessages, useSendMessage } from '../../hooks/useInboxData'
+import { useAuth } from '../../auth/authContext'
 
 const DESKTOP_QUERY = '(min-width: 768px)'
 
@@ -21,29 +20,28 @@ function isDesktopViewport() {
  * contact panel is independently toggled via `isContactPanelOpen`, which
  * defaults to open only on wide (xl, >=1280px) screens so it collapses
  * automatically on narrower desktop/tablet widths per the spec.
+ *
+ * Server state comes from React Query (useConversations / useMessages) with
+ * polling, and outbound sends go through a real mutation that invalidates the
+ * affected queries. A few UI-only overrides remain local because the current
+ * backend has no endpoint for them yet: marking a conversation read on open,
+ * and changing conversation status from the contact panel.
  */
 export default function InboxLayout() {
+  const { user, logout } = useAuth()
   const [view, setView] = useState('list')
   const [selectedId, setSelectedId] = useState(null)
   const [isContactPanelOpen, setIsContactPanelOpen] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1280px)').matches,
   )
 
-  // Dev-only harness state — lets every loading/empty/error state be
-  // reached from the UI instead of living as untested dead code.
-  const [conversationsScenario, setConversationsScenario] = useState('success')
-  const [messagesScenario, setMessagesScenario] = useState('success')
-  const [conversationsRetryKey, setConversationsRetryKey] = useState(0)
-  const [messagesRetryKey, setMessagesRetryKey] = useState(0)
-
-  // Local-only optimistic state layered over the mock "server" data so the
-  // composer, retry, and status changer feel real without a backend yet.
-  const [localMessagesByConversation, setLocalMessagesByConversation] = useState({})
-  const [messageStatusOverrides, setMessageStatusOverrides] = useState({})
+  // UI-only overrides layered over server data (no backend endpoint yet).
   const [conversationStatusOverrides, setConversationStatusOverrides] = useState({})
   const [readConversationIds, setReadConversationIds] = useState({})
 
-  const conversationsResult = useConversations(conversationsScenario, conversationsRetryKey)
+  const conversationsResult = useConversations()
+  const messagesResult = useMessages(selectedId)
+  const sendMutation = useSendMessage(selectedId)
 
   const conversations = useMemo(() => {
     if (!conversationsResult.data) return null
@@ -59,17 +57,7 @@ export default function InboxLayout() {
     [conversations, selectedId],
   )
 
-  const messagesResult = useMessages(selectedId, messagesScenario, messagesRetryKey)
-
-  const messages = useMemo(() => {
-    const fetched = messagesResult.data || []
-    const local = localMessagesByConversation[selectedId] || []
-    return [...fetched, ...local].map((message) =>
-      messageStatusOverrides[message.id]
-        ? { ...message, status: messageStatusOverrides[message.id] }
-        : message,
-    )
-  }, [messagesResult.data, localMessagesByConversation, selectedId, messageStatusOverrides])
+  const messages = useMemo(() => messagesResult.data ?? [], [messagesResult.data])
 
   function handleSelectConversation(id) {
     setSelectedId(id)
@@ -99,23 +87,10 @@ export default function InboxLayout() {
 
   function handleSend(text) {
     if (!selectedId) return
-    const message = {
-      id: `local-${Date.now()}`,
-      conversation_id: selectedId,
-      direction: 'outbound',
-      sender_user_id: 1,
-      body: text,
-      status: 'sent',
-      created_at: new Date().toISOString(),
-    }
-    setLocalMessagesByConversation((prev) => ({
-      ...prev,
-      [selectedId]: [...(prev[selectedId] || []), message],
-    }))
-  }
-
-  function handleRetryMessage(messageId) {
-    setMessageStatusOverrides((prev) => ({ ...prev, [messageId]: 'sent' }))
+    // Mutation success invalidates the messages + conversations queries, so the
+    // thread refetches with the persisted message rather than an optimistic
+    // stand-in. Polling would also pick it up, but invalidation is immediate.
+    sendMutation.mutate(text)
   }
 
   function handleStatusChange(newStatus) {
@@ -123,19 +98,23 @@ export default function InboxLayout() {
     setConversationStatusOverrides((prev) => ({ ...prev, [selectedId]: newStatus }))
   }
 
+  const accountLabel = user?.name || user?.email || 'Account'
+
   return (
     <div className="flex h-full flex-col bg-white">
       <header className="flex shrink-0 items-center justify-between border-b border-gray-200 px-4 py-2.5">
         <span className="text-sm font-semibold text-gray-900">Omni-Inbox</span>
-        <span className="hidden text-xs text-gray-500 sm:inline">{MOCK_BUSINESS.name}</span>
+        <div className="flex items-center gap-3">
+          <span className="hidden text-xs text-gray-500 sm:inline">{accountLabel}</span>
+          <button
+            type="button"
+            onClick={logout}
+            className="rounded-md px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
+          >
+            Sign out
+          </button>
+        </div>
       </header>
-
-      <DevScenarioBar
-        conversationsScenario={conversationsScenario}
-        onConversationsScenarioChange={setConversationsScenario}
-        messagesScenario={messagesScenario}
-        onMessagesScenarioChange={setMessagesScenario}
-      />
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <div
@@ -147,7 +126,7 @@ export default function InboxLayout() {
             error={conversationsResult.error}
             selectedId={selectedId}
             onSelect={handleSelectConversation}
-            onRetry={() => setConversationsRetryKey((k) => k + 1)}
+            onRetry={() => conversationsResult.refetch()}
           />
         </div>
 
@@ -157,9 +136,8 @@ export default function InboxLayout() {
             status={messagesResult.status}
             messages={messages}
             error={messagesResult.error}
-            onRetry={() => setMessagesRetryKey((k) => k + 1)}
+            onRetry={() => messagesResult.refetch()}
             onSend={handleSend}
-            onRetryMessage={handleRetryMessage}
             onBack={handleBackToList}
             onToggleContactPanel={handleToggleContactPanel}
             isContactPanelOpen={isContactPanelOpen}
@@ -178,7 +156,7 @@ export default function InboxLayout() {
             status={conversationsResult.status}
             conversation={selectedConversation}
             error={conversationsResult.error}
-            onRetry={() => setConversationsRetryKey((k) => k + 1)}
+            onRetry={() => conversationsResult.refetch()}
             onClose={handleCloseContactPanel}
             onStatusChange={handleStatusChange}
           />

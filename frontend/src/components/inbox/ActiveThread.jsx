@@ -15,7 +15,6 @@ export default function ActiveThread({
   error,
   onRetry,
   onSend,
-  onRetryMessage,
   onBack,
   onToggleContactPanel,
   isContactPanelOpen,
@@ -65,7 +64,7 @@ export default function ActiveThread({
         {status === 'success' && messages.length > 0 && (
           <div className="flex flex-1 flex-col justify-end gap-2 p-4">
             {messages.map((message) => (
-              <MessageBubble key={message.id} message={message} onRetry={onRetryMessage} />
+              <MessageBubble key={message.id} message={message} />
             ))}
           </div>
         )}

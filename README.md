@@ -96,11 +96,30 @@ then send it as `Authorization: Bearer <token>` on the protected endpoints
 ```bash
 cd frontend
 npm install
+cp .env.example .env   # optional; the default already points at local backend
 npm run dev
 ```
 
-The app is served at `http://localhost:5173/` and expects the backend API to
-be running at `http://localhost:8080/`.
+The app is served at `http://localhost:5173/` and talks to the backend REST API.
+
+### Environment
+
+The frontend reads the API base URL from the Vite env var `VITE_API_BASE_URL`
+(see `frontend/.env.example`). It defaults to `http://localhost:8080/api/v1`,
+which matches `php spark serve`, so no `.env` is required for local dev. Point
+it elsewhere (e.g. a staging API) by setting the var in `frontend/.env`.
+
+Because the frontend (`:5173`) and backend (`:8080`) are different origins, the
+backend enables CORS for `http://localhost:5173` on the `/api/v1/*` routes
+(`backend/app/Config/Cors.php` + `Filters.php`).
+
+### Logging in
+
+Start the backend (`php spark serve`) and seed the dev user
+(`php spark db:seed DevLoginSeeder`), then sign in with the credentials in the
+"Test login credentials" section above. The JWT is stored in `localStorage`;
+an expired or invalid token on any request logs you out back to the sign-in
+screen automatically.
 
 Build for production:
 
